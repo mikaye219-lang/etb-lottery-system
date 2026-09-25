@@ -1,0 +1,12 @@
+{
+  "name": "etb-lottery-system",
+  "version": "4.0.0",
+  "description": "ETB lottery with user payment approval and admin ticket management",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.1"
+  }
+}

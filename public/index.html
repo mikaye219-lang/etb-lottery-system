@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>ETB Lottery</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+  <div>
+    <h1>🎟️ ETB LOTTERY</h1>
+    <p>Choose your lucky number from 1 to 60</p>
+  </div>
+
+  <a href="/admin.html">Admin</a>
+</header>
+
+<main>
+
+  <section class="card">
+
+    <h2>Current Lottery</h2>
+
+    <div class="stats">
+
+      <div>
+        <strong id="players">0</strong>
+        <span>Approved</span>
+      </div>
+
+      <div>
+        <strong id="remaining">60</strong>
+        <span>Remaining</span>
+      </div>
+
+      <div>
+        <strong>500 ETB</strong>
+        <span>Price</span>
+      </div>
+
+    </div>
+
+    <div class="progress">
+      <div id="progress"></div>
+    </div>
+
+    <p id="progressText">0 / 60 approved</p>
+
+  </section>
+
+
+  <section class="card">
+
+    <h2>🎟️ Choose Your Ticket Number</h2>
+
+    <p>
+      Select one available number from 1 to 60.
+      Your number will be confirmed after admin approves your payment.
+    </p>
+
+    <div id="ticketGrid" class="ticket-grid">
+      Loading tickets...
+    </div>
+
+    <p id="selectedText" class="selected-text">
+      No ticket selected.
+    </p>
+
+  </section>
+
+
+  <section class="card">
+
+    <h2>💳 Submit Payment</h2>
+
+    <p class="notice">
+      First choose your ticket number above.
+      Then enter your payment information and TXID.
+    </p>
+
+    <form id="paymentForm">
+
+      <label>User ID</label>
+      <input
+        id="userId"
+        type="text"
+        required
+        placeholder="Enter your user ID"
+      >
+
+      <label>Full Name</label>
+      <input
+        id="name"
+        type="text"
+        required
+        placeholder="Enter your full name"
+      >
+
+      <label>Phone Number</label>
+      <input
+        id="phone"
+        type="text"
+        required
+        placeholder="Enter phone number"
+      >
+
+      <label>TXID</label>
+      <input
+        id="txid"
+        type="text"
+        required
+        placeholder="Enter payment TXID"
+      >
+
+      <button type="submit">
+        Submit Payment - 500 ETB
+      </button>
+
+    </form>
+
+    <div id="message"></div>
+
+  </section>
+
+
+  <section id="statusCard" class="card hidden">
+
+    <h2>📋 Payment Status</h2>
+
+    <p id="statusText"></p>
+
+    <div id="ticketResult"></div>
+
+  </section>
+
+
+  <section id="winnerSection" class="card hidden">
+
+    <h2>🏆 Lottery Winners</h2>
+
+    <div id="winners"></div>
+
+  </section>
+
+</main>
+
+<footer>
+  ETB Lottery
+</footer>
+
+<script src="app.js"></script>
+
+</body>
+</html>

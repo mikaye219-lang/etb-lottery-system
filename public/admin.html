@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>ETB Lottery Admin</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="admin-header">
+  <div>
+    <h1>🎟️ ETB LOTTERY ADMIN</h1>
+    <p>Manage payments, tickets and lottery entries</p>
+  </div>
+
+  <button class="refresh-button" onclick="loadEverything()">
+    ↻ Refresh
+  </button>
+</header>
+
+<main class="admin-container">
+
+  <!-- ================================================= -->
+  <!-- LOTTERY STATUS -->
+  <!-- ================================================= -->
+
+  <section class="stats-grid">
+
+    <div class="stat-card">
+      <span>Round</span>
+      <strong id="roundNumber">1</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Filled</span>
+      <strong id="filledCount">0 / 60</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Remaining</span>
+      <strong id="remainingCount">60</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Progress</span>
+      <strong id="progressPercent">0%</strong>
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- PROGRESS -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>🎯 Lottery Progress</h2>
+        <p>Users and admin entries together fill the 60 tickets.</p>
+      </div>
+
+    </div>
+
+    <div class="progress-bar">
+      <div id="progressBar"></div>
+    </div>
+
+    <p id="lotteryMessage" class="lottery-message">
+      60 numbers are available.
+    </p>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- ADMIN TICKET MANAGEMENT -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>🔢 Admin Ticket Management</h2>
+
+        <p>
+          Admin can select ANY available number from 1–60.
+          Admin entries also count toward the 60.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="admin-form">
+
+      <div class="form-group">
+        <label>Admin/User Name</label>
+
+        <input
+          id="adminName"
+          type="text"
+          placeholder="Enter name"
+        >
+      </div>
+
+      <div class="form-group">
+        <label>Phone</label>
+
+        <input
+          id="adminPhone"
+          type="text"
+          placeholder="Enter phone"
+        >
+      </div>
+
+    </div>
+
+    <h3 class="number-title">
+      Select Any Available Number
+    </h3>
+
+    <div id="adminTicketGrid" class="ticket-grid">
+      Loading numbers...
+    </div>
+
+    <div class="selected-ticket-box">
+
+      Selected number:
+
+      <strong id="selectedAdminTicket">
+        None
+      </strong>
+
+      <button
+        id="assignTicketButton"
+        class="primary-button"
+        onclick="assignAdminTicket()"
+        disabled
+      >
+        Assign Selected Number
+      </button>
+
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- USER PAYMENT REQUESTS -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>💳 User Payment Requests</h2>
+
+        <p>
+          Users receive their ticket ONLY after approval.
+        </p>
+      </div>
+
+      <button
+        class="refresh-button"
+        onclick="loadPayments()"
+      >
+        ↻ Refresh
+      </button>
+
+    </div>
+
+    <div class="filter-buttons">
+
+      <button onclick="filterPayments('ALL')">
+        All
+      </button>
+
+      <button onclick="filterPayments('PENDING')">
+        Pending
+      </button>
+
+      <button onclick="filterPayments('APPROVED')">
+        Approved
+      </button>
+
+      <button onclick="filterPayments('REJECTED')">
+        Rejected
+      </button>
+
+    </div>
+
+    <div id="paymentsContainer">
+      Loading payments...
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- CURRENT TICKETS -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>🎟️ Current 60 Tickets</h2>
+
+        <p>
+          Green = assigned. Yellow = pending. White = available.
+        </p>
+      </div>
+
+      <button
+        class="refresh-button"
+        onclick="loadStatus()"
+      >
+        ↻ Refresh
+      </button>
+
+    </div>
+
+    <div id="currentTicketGrid" class="ticket-grid">
+      Loading...
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- CURRENT PLAYERS -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>👥 Current Entries</h2>
+      </div>
+
+    </div>
+
+    <div id="playersContainer">
+      Loading...
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- WINNERS -->
+  <!-- ================================================= -->
+
+  <section class="card winner-card">
+
+    <h2>🏆 Latest Lottery Result</h2>
+
+    <div id="latestWinner">
+      No draw yet.
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- DRAW HISTORY -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>📜 Draw History</h2>
+      </div>
+
+      <button
+        class="refresh-button"
+        onclick="loadHistory()"
+      >
+        ↻ Refresh
+      </button>
+
+    </div>
+
+    <div id="historyContainer">
+      Loading...
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- USER BALANCE -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>💰 User Balance Management</h2>
+
+        <p>
+          Add or remove user balances.
+        </p>
+      </div>
+
+      <button
+        class="refresh-button"
+        onclick="loadUsers()"
+      >
+        ↻ Refresh
+      </button>
+
+    </div>
+
+    <div id="usersContainer">
+      Loading users...
+    </div>
+
+  </section>
+
+  <!-- ================================================= -->
+  <!-- BALANCE TRANSACTIONS -->
+  <!-- ================================================= -->
+
+  <section class="card">
+
+    <div class="section-heading">
+
+      <div>
+        <h2>🧾 Balance Transactions</h2>
+      </div>
+
+      <button
+        class="refresh-button"
+        onclick="loadBalanceTransactions()"
+      >
+        ↻ Refresh
+      </button>
+
+    </div>
+
+    <div id="balanceTransactions">
+      Loading...
+    </div>
+
+  </section>
+
+</main>
+
+<script src="admin.js"></script>
+
+</body>
+</html>

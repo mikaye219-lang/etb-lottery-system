@@ -1,0 +1,517 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.admin-header {
+  background: #111827;
+  color: white;
+  padding: 22px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.admin-header h1 {
+  margin: 0 0 6px;
+}
+
+.admin-header p {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.admin-container {
+  max-width: 1250px;
+  margin: 25px auto;
+  padding: 0 18px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+
+.stat-card span {
+  display: block;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.stat-card strong {
+  font-size: 28px;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.section-heading h2 {
+  margin: 0 0 6px;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #64748b;
+}
+
+.refresh-button {
+  border: 0;
+  background: #2563eb;
+  color: white;
+  padding: 11px 17px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.refresh-button:hover {
+  opacity: .85;
+}
+
+.progress-bar {
+  height: 20px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+#progressBar {
+  height: 100%;
+  width: 0;
+  background: #16a34a;
+  transition: width .3s;
+}
+
+.lottery-message {
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+.admin-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 7px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+.number-title {
+  margin-top: 25px;
+}
+
+.ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.ticket-button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 9px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+button.ticket-button {
+  cursor: pointer;
+}
+
+.ticket-button.available {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ticket-button.available:hover {
+  background: #bbf7d0;
+}
+
+.ticket-button.reserved {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ticket-button.taken {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.ticket-button.selected {
+  background: #2563eb !important;
+  color: white !important;
+  transform: scale(1.05);
+}
+
+.selected-ticket-box {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.selected-ticket-box strong {
+  font-size: 24px;
+  color: #2563eb;
+}
+
+.primary-button {
+  border: 0;
+  background: #16a34a;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 9px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.filter-buttons button {
+  border: 1px solid #cbd5e1;
+  background: white;
+  padding: 9px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.payment-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  padding: 18px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 20px;
+  align-items: center;
+}
+
+.payment-card h3 {
+  margin: 0 0 8px;
+}
+
+.payment-card p {
+  margin: 7px 0;
+  color: #475569;
+}
+
+.requested-number {
+  font-size: 21px;
+  color: #2563eb;
+}
+
+.status {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.approve-button,
+.reject-button {
+  border: 0;
+  padding: 11px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.approve-button {
+  background: #16a34a;
+  color: white;
+}
+
+.reject-button {
+  background: #dc2626;
+  color: white;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+th {
+  background: #f8fafc;
+}
+
+.winner-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.winner {
+  border-radius: 13px;
+  padding: 20px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.winner span {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.winner strong {
+  display: block;
+  font-size: 20px;
+}
+
+.winner b {
+  display: block;
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+.history-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+.history-card h3 {
+  margin: 0;
+}
+
+.history-winners {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.empty {
+  padding: 25px;
+  text-align: center;
+  color: #64748b;
+}
+
+.error {
+  color: #dc2626;
+  padding: 20px;
+}
+
+.user-card {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+.user-card h3 {
+  margin: 0 0 8px;
+}
+
+.user-card p {
+  margin: 5px 0;
+  color: #64748b;
+}
+
+.user-balance {
+  text-align: center;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 15px;
+}
+
+.user-balance span {
+  display: block;
+  color: #64748b;
+}
+
+.user-balance strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 5px;
+}
+
+.balance-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-button,
+.remove-button {
+  border: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: white;
+  font-weight: bold;
+}
+
+.add-button {
+  background: #16a34a;
+}
+
+.remove-button {
+  background: #dc2626;
+}
+
+.balance-transaction {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 15px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 9px;
+}
+
+.balance-transaction small {
+  color: #64748b;
+  display: block;
+  margin-top: 5px;
+}
+
+.credit {
+  color: #16a34a;
+  font-weight: bold;
+}
+
+.debit {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+@media (max-width: 900px) {
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .payment-card {
+    grid-template-columns: 1fr;
+  }
+
+  .winner-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .balance-transaction {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .card {
+    padding: 16px;
+  }
+}
