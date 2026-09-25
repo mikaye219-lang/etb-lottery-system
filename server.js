@@ -1,8 +1,14 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// =====================================================
+// CONFIGURATION
+// =====================================================
 
 const TICKET_PRICE = 500;
 const MAX_TICKETS = 60;
@@ -13,8 +19,88 @@ const PRIZES = {
   third: 4000
 };
 
+// IMPORTANT:
+// Set ADMIN_PASSWORD in Render Environment Variables.
+// For local testing, you can create a .env file.
+const ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD || "CHANGE_THIS_ADMIN_PASSWORD";
+
+// =====================================================
+// ADMIN LOGIN SESSIONS
+// =====================================================
+
+// Sessions are stored in memory.
+// Restarting the server logs the admin out.
+const adminSessions = new Set();
+
+// =====================================================
+// APP SETUP
+// =====================================================
+
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+
+// =====================================================
+// COOKIE HELPERS
+// =====================================================
+
+function parseCookies(req) {
+  const cookies = {};
+
+  const header = req.headers.cookie;
+
+  if (!header) {
+    return cookies;
+  }
+
+  header.split(";").forEach(cookie => {
+    const parts = cookie.trim().split("=");
+
+    const key = parts.shift();
+
+    if (!key) {
+      return;
+    }
+
+    cookies[key] = decodeURIComponent(parts.join("="));
+  });
+
+  return cookies;
+}
+
+function createAdminSession() {
+  const token = crypto.randomBytes(32).toString("hex");
+
+  adminSessions.add(token);
+
+  return token;
+}
+
+function isAdminAuthenticated(req) {
+  const cookies = parseCookies(req);
+
+  const token = cookies.admin_session;
+
+  if (!token) {
+    return false;
+  }
+
+  return adminSessions.has(token);
+}
+
+// =====================================================
+// ADMIN API PROTECTION
+// =====================================================
+
+function requireAdmin(req, res, next) {
+  if (!isAdminAuthenticated(req)) {
+    return res.status(401).json({
+      success: false,
+      message: "Admin login required."
+    });
+  }
+
+  next();
+}
 
 // =====================================================
 // DATA
@@ -42,12 +128,19 @@ function makeId(prefix, counter) {
 
 function validTicket(number) {
   const n = Number(number);
-  return Number.isInteger(n) && n >= 1 && n <= 60;
+
+  return (
+    Number.isInteger(n) &&
+    n >= 1 &&
+    n <= 60
+  );
 }
 
 function findPlayer(ticketNumber) {
   return players.find(
-    p => Number(p.ticketNumber) === Number(ticketNumber)
+    p =>
+      Number(p.ticketNumber) ===
+      Number(ticketNumber)
   );
 }
 
@@ -59,9 +152,10 @@ function getUsedTickets() {
 
 function getPendingTickets() {
   return payments
-    .filter(p =>
-      p.round === roundNumber &&
-      p.status === "PENDING"
+    .filter(
+      p =>
+        p.round === roundNumber &&
+        p.status === "PENDING"
     )
     .map(p => Number(p.selectedTicket))
     .filter(validTicket)
@@ -71,8 +165,10 @@ function getPendingTickets() {
 function getAvailableTickets() {
   const used = new Set(getUsedTickets());
 
-  return Array.from({ length: 60 }, (_, i) => i + 1)
-    .filter(n => !used.has(n));
+  return Array.from(
+    { length: MAX_TICKETS },
+    (_, i) => i + 1
+  ).filter(n => !used.has(n));
 }
 
 function getUser(userId) {
@@ -84,30 +180,41 @@ function getUser(userId) {
 // =====================================================
 
 function executeLotteryDraw() {
-  if (players.length !== 60) {
+  if (players.length !== MAX_TICKETS) {
     return null;
   }
 
   // Copy all 60 entries.
-  // Every entry can be a normal user or an admin entry.
   const pool = [...players];
 
-  // First
-  const firstIndex = Math.floor(Math.random() * pool.length);
-  const first = pool.splice(firstIndex, 1)[0];
+  // FIRST
+  const firstIndex =
+    Math.floor(Math.random() * pool.length);
 
-  // Second - different from first
-  const secondIndex = Math.floor(Math.random() * pool.length);
-  const second = pool.splice(secondIndex, 1)[0];
+  const first =
+    pool.splice(firstIndex, 1)[0];
 
-  // Third - different from first and second
-  const thirdIndex = Math.floor(Math.random() * pool.length);
-  const third = pool.splice(thirdIndex, 1)[0];
+  // SECOND
+  const secondIndex =
+    Math.floor(Math.random() * pool.length);
+
+  const second =
+    pool.splice(secondIndex, 1)[0];
+
+  // THIRD
+  const thirdIndex =
+    Math.floor(Math.random() * pool.length);
+
+  const third =
+    pool.splice(thirdIndex, 1)[0];
 
   const draw = {
     id: `DRAW-${Date.now()}`,
+
     round: roundNumber,
-    date: new Date().toISOString(),
+
+    date:
+      new Date().toISOString(),
 
     first: {
       name: first.name,
@@ -136,7 +243,7 @@ function executeLotteryDraw() {
       prize: PRIZES.third
     },
 
-    totalPlayers: 60
+    totalPlayers: MAX_TICKETS
   };
 
   drawHistory.unshift(draw);
@@ -154,12 +261,133 @@ function executeLotteryDraw() {
 }
 
 // =====================================================
+// ADMIN LOGIN PAGE
+// =====================================================
+
+app.get("/admin.html", (req, res) => {
+  if (!isAdminAuthenticated(req)) {
+    return res.redirect("/admin-login.html");
+  }
+
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      "admin.html"
+    )
+  );
+});
+
+// =====================================================
+// ADMIN LOGIN
+// =====================================================
+
+app.post("/api/admin/login", (req, res) => {
+  const password =
+    typeof req.body.password === "string"
+      ? req.body.password
+      : "";
+
+  if (!password) {
+    return res.status(400).json({
+      success: false,
+      message: "Password is required."
+    });
+  }
+
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({
+      success: false,
+      message: "Incorrect admin password."
+    });
+  }
+
+  const sessionToken =
+    createAdminSession();
+
+  const secure =
+    process.env.NODE_ENV === "production"
+      ? "; Secure"
+      : "";
+
+  res.setHeader(
+    "Set-Cookie",
+    `admin_session=${encodeURIComponent(
+      sessionToken
+    )}; HttpOnly; Path=/; SameSite=Strict${secure}`
+  );
+
+  res.json({
+    success: true,
+    message: "Admin login successful."
+  });
+});
+
+// =====================================================
+// ADMIN LOGOUT
+// =====================================================
+
+app.post(
+  "/api/admin/logout",
+  requireAdmin,
+  (req, res) => {
+    const cookies = parseCookies(req);
+
+    const token =
+      cookies.admin_session;
+
+    if (token) {
+      adminSessions.delete(token);
+    }
+
+    res.setHeader(
+      "Set-Cookie",
+      "admin_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict"
+    );
+
+    res.json({
+      success: true,
+      message: "Admin logged out."
+    });
+  }
+);
+
+// =====================================================
+// CHECK ADMIN LOGIN
+// =====================================================
+
+app.get(
+  "/api/admin/me",
+  requireAdmin,
+  (req, res) => {
+    res.json({
+      success: true,
+      authenticated: true
+    });
+  }
+);
+
+// =====================================================
+// STATIC FILES
+// =====================================================
+
+app.use(
+  express.static(
+    path.join(__dirname, "public")
+  )
+);
+
+// =====================================================
 // HOME
 // =====================================================
 
 app.get("/", (req, res) => {
   res.sendFile(
-    path.join(__dirname, "public", "index.html")
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
   );
 });
 
@@ -168,38 +396,58 @@ app.get("/", (req, res) => {
 // =====================================================
 
 app.get("/api/status", (req, res) => {
-  const used = getUsedTickets();
-  const pending = getPendingTickets();
-  const available = getAvailableTickets();
+  const used =
+    getUsedTickets();
+
+  const pending =
+    getPendingTickets();
+
+  const available =
+    getAvailableTickets();
 
   res.json({
     success: true,
+
     round: roundNumber,
+
     ticketPrice: TICKET_PRICE,
+
     maxPlayers: MAX_TICKETS,
 
-    approvedPlayers: players.length,
+    approvedPlayers:
+      players.length,
 
-    remaining: MAX_TICKETS - players.length,
+    remaining:
+      MAX_TICKETS - players.length,
 
-    progress: Math.round(
-      (players.length / MAX_TICKETS) * 100
-    ),
+    progress:
+      Math.round(
+        (players.length /
+          MAX_TICKETS) *
+          100
+      ),
 
-    availableTickets: available,
+    availableTickets:
+      available,
 
-    takenTickets: used,
+    takenTickets:
+      used,
 
-    reservedTickets: pending,
+    reservedTickets:
+      pending,
 
-    players: players.map(p => ({
-      userId: p.userId,
-      name: p.name,
-      phone: p.phone,
-      ticketNumber: p.ticketNumber,
-      ticketId: p.ticketId,
-      source: p.source
-    }))
+    players:
+      players.map(p => ({
+        userId: p.userId,
+        name: p.name,
+        phone: p.phone,
+        ticketNumber:
+          p.ticketNumber,
+        ticketId:
+          p.ticketId,
+        source:
+          p.source
+      }))
   });
 });
 
@@ -207,160 +455,199 @@ app.get("/api/status", (req, res) => {
 // USER SUBMITS PAYMENT + REQUESTED NUMBER
 // =====================================================
 
-app.post("/api/payment/submit", (req, res) => {
-  const {
-    userId,
-    name,
-    phone,
-    txid,
-    selectedTicket
-  } = req.body;
+app.post(
+  "/api/payment/submit",
+  (req, res) => {
 
-  if (
-    !userId ||
-    !name ||
-    !phone ||
-    !txid ||
-    selectedTicket === undefined
-  ) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "User ID, name, phone, TXID and ticket number are required."
-    });
-  }
-
-  const ticket = Number(selectedTicket);
-
-  if (!validTicket(ticket)) {
-    return res.status(400).json({
-      success: false,
-      message: "Ticket number must be between 1 and 60."
-    });
-  }
-
-  if (players.length >= 60) {
-    return res.status(400).json({
-      success: false,
-      message: "This round is already full."
-    });
-  }
-
-  const duplicateTxid = payments.find(
-    p =>
-      String(p.txid).trim().toLowerCase() ===
-      String(txid).trim().toLowerCase()
-  );
-
-  if (duplicateTxid) {
-    return res.status(400).json({
-      success: false,
-      message: "This TXID has already been submitted."
-    });
-  }
-
-  const existingUser = payments.find(
-    p =>
-      p.userId === userId &&
-      p.round === roundNumber &&
-      (p.status === "PENDING" ||
-       p.status === "APPROVED")
-  );
-
-  if (existingUser) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "You already have a payment in this round."
-    });
-  }
-
-  // Already officially assigned?
-  if (findPlayer(ticket)) {
-    return res.status(400).json({
-      success: false,
-      message:
-        `Ticket ${ticket} is already taken.`
-    });
-  }
-
-  // Another user currently waiting for approval?
-  const pending = payments.find(
-    p =>
-      p.round === roundNumber &&
-      p.status === "PENDING" &&
-      Number(p.selectedTicket) === ticket
-  );
-
-  if (pending) {
-    return res.status(400).json({
-      success: false,
-      message:
-        `Ticket ${ticket} is currently reserved by another pending payment.`
-    });
-  }
-
-  // Create user
-  let user = getUser(userId);
-
-  if (!user) {
-    user = {
-      id: userId,
+    const {
+      userId,
       name,
       phone,
-      balance: 0,
-      createdAt: new Date().toISOString()
+      txid,
+      selectedTicket
+    } = req.body;
+
+    if (
+      !userId ||
+      !name ||
+      !phone ||
+      !txid ||
+      selectedTicket === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "User ID, name, phone, TXID and ticket number are required."
+      });
+    }
+
+    const ticket =
+      Number(selectedTicket);
+
+    if (!validTicket(ticket)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Ticket number must be between 1 and 60."
+      });
+    }
+
+    if (players.length >= MAX_TICKETS) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This round is already full."
+      });
+    }
+
+    const duplicateTxid =
+      payments.find(
+        p =>
+          String(p.txid)
+            .trim()
+            .toLowerCase() ===
+          String(txid)
+            .trim()
+            .toLowerCase()
+      );
+
+    if (duplicateTxid) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This TXID has already been submitted."
+      });
+    }
+
+    const existingUser =
+      payments.find(
+        p =>
+          p.userId === userId &&
+          p.round === roundNumber &&
+          (
+            p.status === "PENDING" ||
+            p.status === "APPROVED"
+          )
+      );
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "You already have a payment in this round."
+      });
+    }
+
+    if (findPlayer(ticket)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          `Ticket ${ticket} is already taken.`
+      });
+    }
+
+    const pending =
+      payments.find(
+        p =>
+          p.round === roundNumber &&
+          p.status === "PENDING" &&
+          Number(p.selectedTicket) === ticket
+      );
+
+    if (pending) {
+      return res.status(400).json({
+        success: false,
+        message:
+          `Ticket ${ticket} is currently reserved by another pending payment.`
+      });
+    }
+
+    let user =
+      getUser(userId);
+
+    if (!user) {
+      user = {
+        id: userId,
+        name,
+        phone,
+        balance: 0,
+        createdAt:
+          new Date().toISOString()
+      };
+
+      users.push(user);
+    }
+
+    const payment = {
+      id:
+        makeId(
+          "PAY",
+          paymentCounter++
+        ),
+
+      userId,
+
+      name,
+
+      phone,
+
+      txid,
+
+      amount:
+        TICKET_PRICE,
+
+      round:
+        roundNumber,
+
+      selectedTicket:
+        ticket,
+
+      ticketNumber:
+        null,
+
+      ticketId:
+        null,
+
+      status:
+        "PENDING",
+
+      rejectionReason:
+        null,
+
+      createdAt:
+        new Date().toISOString(),
+
+      approvedAt:
+        null,
+
+      rejectedAt:
+        null
     };
 
-    users.push(user);
+    payments.push(payment);
+
+    res.json({
+      success: true,
+
+      message:
+        `Payment submitted. You will receive ticket ${ticket} only after admin approval.`,
+
+      payment: {
+        id:
+          payment.id,
+
+        status:
+          payment.status,
+
+        selectedTicket:
+          payment.selectedTicket,
+
+        ticketNumber:
+          null
+      }
+    });
   }
-
-  const payment = {
-    id: makeId("PAY", paymentCounter++),
-
-    userId,
-    name,
-    phone,
-    txid,
-
-    amount: TICKET_PRICE,
-
-    round: roundNumber,
-
-    // Requested by user.
-    selectedTicket: ticket,
-
-    // IMPORTANT:
-    // This stays null until admin approves.
-    ticketNumber: null,
-    ticketId: null,
-
-    status: "PENDING",
-
-    rejectionReason: null,
-
-    createdAt: new Date().toISOString(),
-
-    approvedAt: null,
-    rejectedAt: null
-  };
-
-  payments.push(payment);
-
-  res.json({
-    success: true,
-
-    message:
-      `Payment submitted. You will receive ticket ${ticket} only after admin approval.`,
-
-    payment: {
-      id: payment.id,
-      status: payment.status,
-      selectedTicket: payment.selectedTicket,
-      ticketNumber: null
-    }
-  });
-});
+);
 
 // =====================================================
 // USER PAYMENT STATUS
@@ -369,14 +656,19 @@ app.post("/api/payment/submit", (req, res) => {
 app.get(
   "/api/payment/status/:paymentId",
   (req, res) => {
-    const payment = payments.find(
-      p => p.id === req.params.paymentId
-    );
+
+    const payment =
+      payments.find(
+        p =>
+          p.id ===
+          req.params.paymentId
+      );
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "Payment not found."
+        message:
+          "Payment not found."
       });
     }
 
@@ -384,27 +676,38 @@ app.get(
       success: true,
 
       payment: {
-        id: payment.id,
-        status: payment.status,
+        id:
+          payment.id,
 
-        selectedTicket: payment.selectedTicket,
+        status:
+          payment.status,
 
-        // NULL until approved.
-        ticketNumber: payment.ticketNumber,
+        selectedTicket:
+          payment.selectedTicket,
 
-        ticketId: payment.ticketId,
+        ticketNumber:
+          payment.ticketNumber,
+
+        ticketId:
+          payment.ticketId,
 
         rejectionReason:
           payment.rejectionReason,
 
-        round: payment.round,
+        round:
+          payment.round,
 
-        amount: payment.amount,
+        amount:
+          payment.amount,
 
-        createdAt: payment.createdAt,
+        createdAt:
+          payment.createdAt,
 
-        approvedAt: payment.approvedAt,
-        rejectedAt: payment.rejectedAt
+        approvedAt:
+          payment.approvedAt,
+
+        rejectedAt:
+          payment.rejectedAt
       }
     });
   }
@@ -414,12 +717,19 @@ app.get(
 // ADMIN: PAYMENT LIST
 // =====================================================
 
-app.get("/api/admin/payments", (req, res) => {
-  res.json({
-    success: true,
-    payments: [...payments].reverse()
-  });
-});
+app.get(
+  "/api/admin/payments",
+  requireAdmin,
+  (req, res) => {
+
+    res.json({
+      success: true,
+
+      payments:
+        [...payments].reverse()
+    });
+  }
+);
 
 // =====================================================
 // ADMIN: APPROVE USER PAYMENT
@@ -427,16 +737,21 @@ app.get("/api/admin/payments", (req, res) => {
 
 app.post(
   "/api/admin/payment/:paymentId/approve",
+  requireAdmin,
   (req, res) => {
 
-    const payment = payments.find(
-      p => p.id === req.params.paymentId
-    );
+    const payment =
+      payments.find(
+        p =>
+          p.id ===
+          req.params.paymentId
+      );
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "Payment not found."
+        message:
+          "Payment not found."
       });
     }
 
@@ -448,14 +763,18 @@ app.post(
       });
     }
 
-    if (payment.round !== roundNumber) {
+    if (
+      payment.round !==
+      roundNumber
+    ) {
       return res.status(400).json({
         success: false,
-        message: "This payment belongs to an old round."
+        message:
+          "This payment belongs to an old round."
       });
     }
 
-    if (players.length >= 60) {
+    if (players.length >= MAX_TICKETS) {
       return res.status(400).json({
         success: false,
         message:
@@ -463,19 +782,19 @@ app.post(
       });
     }
 
-    const ticket = Number(
-      payment.selectedTicket
-    );
+    const ticket =
+      Number(
+        payment.selectedTicket
+      );
 
     if (!validTicket(ticket)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid ticket number."
+        message:
+          "Invalid ticket number."
       });
     }
 
-    // Check whether admin already used this number
-    // or another approved user already has it.
     if (findPlayer(ticket)) {
       return res.status(400).json({
         success: false,
@@ -484,39 +803,55 @@ app.post(
       });
     }
 
-    // Approve.
-    payment.status = "APPROVED";
+    payment.status =
+      "APPROVED";
 
-    payment.ticketNumber = ticket;
+    payment.ticketNumber =
+      ticket;
 
     payment.ticketId =
-      makeId("TCK", ticketCounter++);
+      makeId(
+        "TCK",
+        ticketCounter++
+      );
 
     payment.approvedAt =
       new Date().toISOString();
 
     players.push({
-      userId: payment.userId,
+      userId:
+        payment.userId,
 
-      name: payment.name,
+      name:
+        payment.name,
 
-      phone: payment.phone,
+      phone:
+        payment.phone,
 
-      ticketNumber: ticket,
+      ticketNumber:
+        ticket,
 
-      ticketId: payment.ticketId,
+      ticketId:
+        payment.ticketId,
 
-      round: roundNumber,
+      round:
+        roundNumber,
 
-      source: "USER",
+      source:
+        "USER",
 
-      joinedAt: new Date().toISOString()
+      joinedAt:
+        new Date().toISOString()
     });
 
     let draw = null;
 
-    if (players.length === 60) {
-      draw = executeLotteryDraw();
+    if (
+      players.length ===
+      MAX_TICKETS
+    ) {
+      draw =
+        executeLotteryDraw();
     }
 
     res.json({
@@ -527,9 +862,10 @@ app.post(
 
       payment,
 
-      totalEntries: draw
-        ? 60
-        : players.length,
+      totalEntries:
+        draw
+          ? MAX_TICKETS
+          : players.length,
 
       draw
     });
@@ -542,16 +878,21 @@ app.post(
 
 app.post(
   "/api/admin/payment/:paymentId/reject",
+  requireAdmin,
   (req, res) => {
 
-    const payment = payments.find(
-      p => p.id === req.params.paymentId
-    );
+    const payment =
+      payments.find(
+        p =>
+          p.id ===
+          req.params.paymentId
+      );
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "Payment not found."
+        message:
+          "Payment not found."
       });
     }
 
@@ -563,7 +904,8 @@ app.post(
       });
     }
 
-    payment.status = "REJECTED";
+    payment.status =
+      "REJECTED";
 
     payment.rejectionReason =
       req.body.reason ||
@@ -571,8 +913,6 @@ app.post(
 
     payment.rejectedAt =
       new Date().toISOString();
-
-    // The requested number is now free again.
 
     res.json({
       success: true,
@@ -588,22 +928,10 @@ app.post(
 // =====================================================
 // ADMIN: MANUALLY USE ANY AVAILABLE NUMBER
 // =====================================================
-//
-// THIS IS THE IMPORTANT NEW FUNCTION.
-//
-// Admin can choose ANY AVAILABLE number 1-60.
-// It does not require a user payment.
-//
-// Example:
-// 2
-// 30
-// 54
-// 60
-//
-// =====================================================
 
 app.post(
   "/api/admin/assign-ticket",
+  requireAdmin,
   (req, res) => {
 
     const {
@@ -612,7 +940,11 @@ app.post(
       ticketNumber
     } = req.body;
 
-    if (!name || !phone || ticketNumber === undefined) {
+    if (
+      !name ||
+      !phone ||
+      ticketNumber === undefined
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -620,7 +952,8 @@ app.post(
       });
     }
 
-    const ticket = Number(ticketNumber);
+    const ticket =
+      Number(ticketNumber);
 
     if (!validTicket(ticket)) {
       return res.status(400).json({
@@ -630,7 +963,7 @@ app.post(
       });
     }
 
-    if (players.length >= 60) {
+    if (players.length >= MAX_TICKETS) {
       return res.status(400).json({
         success: false,
         message:
@@ -638,7 +971,6 @@ app.post(
       });
     }
 
-    // Number already used by user/admin?
     if (findPlayer(ticket)) {
       return res.status(400).json({
         success: false,
@@ -647,15 +979,14 @@ app.post(
       });
     }
 
-    // If a user has requested this number and
-    // is waiting for approval, don't let admin
-    // accidentally take it.
-    const pending = payments.find(
-      p =>
-        p.round === roundNumber &&
-        p.status === "PENDING" &&
-        Number(p.selectedTicket) === ticket
-    );
+    const pending =
+      payments.find(
+        p =>
+          p.round === roundNumber &&
+          p.status === "PENDING" &&
+          Number(p.selectedTicket) ===
+            ticket
+      );
 
     if (pending) {
       return res.status(400).json({
@@ -666,30 +997,42 @@ app.post(
     }
 
     const ticketId =
-      makeId("TCK", ticketCounter++);
+      makeId(
+        "TCK",
+        ticketCounter++
+      );
 
     players.push({
-      userId: `ADMIN-${Date.now()}`,
+      userId:
+        `ADMIN-${Date.now()}`,
 
       name,
 
       phone,
 
-      ticketNumber: ticket,
+      ticketNumber:
+        ticket,
 
       ticketId,
 
-      round: roundNumber,
+      round:
+        roundNumber,
 
-      source: "ADMIN",
+      source:
+        "ADMIN",
 
-      joinedAt: new Date().toISOString()
+      joinedAt:
+        new Date().toISOString()
     });
 
     let draw = null;
 
-    if (players.length === 60) {
-      draw = executeLotteryDraw();
+    if (
+      players.length ===
+      MAX_TICKETS
+    ) {
+      draw =
+        executeLotteryDraw();
     }
 
     res.json({
@@ -699,21 +1042,29 @@ app.post(
         `Admin successfully used ticket number ${ticket}.`,
 
       ticket: {
-        ticketNumber: ticket,
+        ticketNumber:
+          ticket,
+
         ticketId,
+
         name,
+
         phone,
-        source: "ADMIN"
+
+        source:
+          "ADMIN"
       },
 
-      totalEntries: draw
-        ? 60
-        : players.length,
+      totalEntries:
+        draw
+          ? MAX_TICKETS
+          : players.length,
 
       remaining:
         draw
           ? 0
-          : 60 - players.length,
+          : MAX_TICKETS -
+            players.length,
 
       draw
     });
@@ -724,38 +1075,53 @@ app.post(
 // ADMIN: CURRENT PLAYERS
 // =====================================================
 
-app.get("/api/admin/players", (req, res) => {
-  res.json({
-    success: true,
+app.get(
+  "/api/admin/players",
+  requireAdmin,
+  (req, res) => {
 
-    total: players.length,
+    res.json({
+      success: true,
 
-    players
-  });
-});
+      total:
+        players.length,
+
+      players
+    });
+  }
+);
 
 // =====================================================
 // ADMIN: USERS
 // =====================================================
 
-app.get("/api/admin/users", (req, res) => {
+app.get(
+  "/api/admin/users",
+  requireAdmin,
+  (req, res) => {
 
-  const totalBalance = users.reduce(
-    (sum, user) =>
-      sum + Number(user.balance || 0),
-    0
-  );
+    const totalBalance =
+      users.reduce(
+        (sum, user) =>
+          sum +
+          Number(
+            user.balance || 0
+          ),
+        0
+      );
 
-  res.json({
-    success: true,
+    res.json({
+      success: true,
 
-    totalUsers: users.length,
+      totalUsers:
+        users.length,
 
-    totalBalance,
+      totalBalance,
 
-    users
-  });
-});
+      users
+    });
+  }
+);
 
 // =====================================================
 // ADMIN: ADD BALANCE
@@ -763,49 +1129,66 @@ app.get("/api/admin/users", (req, res) => {
 
 app.post(
   "/api/admin/user/:userId/add-balance",
+  requireAdmin,
   (req, res) => {
 
-    const user = getUser(req.params.userId);
+    const user =
+      getUser(
+        req.params.userId
+      );
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message:
+          "User not found."
       });
     }
 
-    const amount = Number(req.body.amount);
+    const amount =
+      Number(req.body.amount);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid amount."
+        message:
+          "Invalid amount."
       });
     }
 
     const oldBalance =
-      Number(user.balance || 0);
+      Number(
+        user.balance || 0
+      );
 
     user.balance =
       oldBalance + amount;
 
     balanceTransactions.unshift({
-      id: makeId(
-        "BAL",
-        balanceCounter++
-      ),
+      id:
+        makeId(
+          "BAL",
+          balanceCounter++
+        ),
 
-      userId: user.id,
+      userId:
+        user.id,
 
-      name: user.name,
+      name:
+        user.name,
 
-      type: "CREDIT",
+      type:
+        "CREDIT",
 
       amount,
 
       oldBalance,
 
-      newBalance: user.balance,
+      newBalance:
+        user.balance,
 
       reason:
         req.body.reason ||
@@ -832,28 +1215,40 @@ app.post(
 
 app.post(
   "/api/admin/user/:userId/remove-balance",
+  requireAdmin,
   (req, res) => {
 
-    const user = getUser(req.params.userId);
+    const user =
+      getUser(
+        req.params.userId
+      );
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message:
+          "User not found."
       });
     }
 
-    const amount = Number(req.body.amount);
+    const amount =
+      Number(req.body.amount);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid amount."
+        message:
+          "Invalid amount."
       });
     }
 
     const oldBalance =
-      Number(user.balance || 0);
+      Number(
+        user.balance || 0
+      );
 
     if (amount > oldBalance) {
       return res.status(400).json({
@@ -867,22 +1262,27 @@ app.post(
       oldBalance - amount;
 
     balanceTransactions.unshift({
-      id: makeId(
-        "BAL",
-        balanceCounter++
-      ),
+      id:
+        makeId(
+          "BAL",
+          balanceCounter++
+        ),
 
-      userId: user.id,
+      userId:
+        user.id,
 
-      name: user.name,
+      name:
+        user.name,
 
-      type: "DEBIT",
+      type:
+        "DEBIT",
 
       amount,
 
       oldBalance,
 
-      newBalance: user.balance,
+      newBalance:
+        user.balance,
 
       reason:
         req.body.reason ||
@@ -909,6 +1309,7 @@ app.post(
 
 app.get(
   "/api/admin/balance-transactions",
+  requireAdmin,
   (req, res) => {
 
     res.json({
@@ -924,55 +1325,110 @@ app.get(
 // DRAW HISTORY
 // =====================================================
 
-app.get("/api/history", (req, res) => {
-  res.json({
-    success: true,
-    history: drawHistory
-  });
-});
+app.get(
+  "/api/history",
+  (req, res) => {
+
+    res.json({
+      success: true,
+
+      history:
+        drawHistory
+    });
+  }
+);
 
 // =====================================================
 // LATEST DRAW
 // =====================================================
 
-app.get("/api/latest-draw", (req, res) => {
-  res.json({
-    success: true,
+app.get(
+  "/api/latest-draw",
+  (req, res) => {
 
-    draw:
-      drawHistory.length
-        ? drawHistory[0]
-        : null
-  });
-});
+    res.json({
+      success: true,
+
+      draw:
+        drawHistory.length
+          ? drawHistory[0]
+          : null
+    });
+  }
+);
 
 // =====================================================
 // HEALTH
 // =====================================================
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    status: "OK",
-    round: roundNumber,
-    entries: players.length,
-    maxEntries: 60,
-    time: new Date().toISOString()
-  });
-});
+app.get(
+  "/api/health",
+  (req, res) => {
+
+    res.json({
+      success: true,
+
+      status:
+        "OK",
+
+      round:
+        roundNumber,
+
+      entries:
+        players.length,
+
+      maxEntries:
+        MAX_TICKETS,
+
+      time:
+        new Date().toISOString()
+    });
+  }
+);
 
 // =====================================================
 // START
 // =====================================================
 
 app.listen(PORT, () => {
-  console.log("------------------------------------");
-  console.log("ETB LOTTERY SYSTEM");
-  console.log("------------------------------------");
-  console.log(`Server running on port ${PORT}`);
-  console.log("Ticket numbers: 1 - 60");
-  console.log("User ticket: given ONLY after approval");
-  console.log("Admin: can use ANY available number");
-  console.log("Automatic draw: 60/60");
-  console.log("------------------------------------");
+
+  console.log(
+    "------------------------------------"
+  );
+
+  console.log(
+    "ETB LOTTERY SYSTEM"
+  );
+
+  console.log(
+    "------------------------------------"
+  );
+
+  console.log(
+    `Server running on port ${PORT}`
+  );
+
+  console.log(
+    "Ticket numbers: 1 - 60"
+  );
+
+  console.log(
+    "User ticket: given ONLY after approval"
+  );
+
+  console.log(
+    "Admin: can use ANY available number"
+  );
+
+  console.log(
+    "Automatic draw: 60/60"
+  );
+
+  console.log(
+    "Admin authentication: ENABLED"
+  );
+
+  console.log(
+    "------------------------------------"
+  );
 });
